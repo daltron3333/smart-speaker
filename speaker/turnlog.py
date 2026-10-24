@@ -20,7 +20,8 @@ def write(path: Path, record: dict) -> None:
     except OSError as e:
         log.warning("could not write %s: %s", path, e)
     timings = {k: v for k, v in record.items() if k.endswith("_s")}
-    log.info("turn %s", " ".join(f"{k}={v}" for k, v in timings.items()))
+    if timings:  # wake-test records have none
+        log.info("turn %s", " ".join(f"{k}={v}" for k, v in timings.items()))
 
 
 def summarize(path: Path, field: str = "first_audio_s", last: int | None = None) -> str:
