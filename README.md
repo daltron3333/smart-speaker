@@ -77,13 +77,20 @@ Every `python -m speaker ...` command reads it automatically.
 
 ## Wake word: training "Hey Mango"
 
-"Hey Mango" isn't one of openWakeWord's built-in phrases, so it needs its own small model. Until `wakewords/hey_mango.onnx` exists, the speaker uses "hey Jarvis" and logs a warning, and `self-test` reports a FAIL for it.
+"Hey Mango" isn't one of openWakeWord's built-in phrases, so it has its own small model, `wakewords/hey_mango.onnx`, which is included. If that file is missing, the speaker uses "hey Jarvis" and logs a warning, and `self-test` reports a FAIL for it. To retrain it (for example, for better accuracy):
 
 1. Open openWakeWord's [training notebook on Google Colab](https://colab.research.google.com/drive/1q1oe2zOyZp7UsB3jJiQ1IFn8z5YfjwEb?usp=sharing) and sign in with a Google account. It's free.
 2. Set the target phrase to `hey mango`. Before training, use the notebook's play button to check that its voice pronounces it right; if not, try a spelling like `hey man go`.
 3. Run all the cells (**Runtime → Run all**). It generates thousands of synthetic "hey mango" clips and trains for about an hour. Leave the tab open.
 4. Download the `.onnx` file it produces, rename it to `hey_mango.onnx`, and put it in this project's `wakewords/` folder.
 5. Check it: `.venv/bin/python -m speaker self-test` should show PASS for "hey mango". On the Pi, run `speaker wake-test` and say it from across the room.
+
+**Colab fixes (as of October 2026).** The notebook breaks on Colab's newest runtime. To get it working, three fixes were needed:
+- **Python 3.13 runtime:** its speech package, `piper-phonemize`, only installs on Python 3.12 or older, so you get `No module named 'piper_phonemize'`. Fix: before running, choose **Runtime → Change runtime type → Runtime version → 2026.01**, which has Python 3.12.
+- **"Numba needs NumPy 2.0 or less":** step 2 upgrades NumPy beyond what that image's Numba supports. Fix: in a new cell, run `!pip install -q -U numba llvmlite`, then **Runtime → Restart session and run all**.
+- **Repeated "Restart session" prompts:** after that one restart, click **Cancel** on any further prompt. Training runs as separate programs, so they don't matter.
+
+The AudioSet background download in step 2 returns 404, but training carries on with the music background clips alone. The included model was trained this way with the default settings (1,000 examples, 10,000 steps) in about 40 minutes on CPU. In tests with Piper's voice it scores 0.88 on "hey mango", and among near misses it reacts only to "hey man, go".
 
 The model is a few hundred KB and is committed with the code, so it reaches the Pi with everything else. If it wakes too easily or misses you, adjust `SPEAKER_WAKE_THRESHOLD`. If it's still poor, retrain with the notebook's advanced version, which takes longer but makes a stronger model.
 
