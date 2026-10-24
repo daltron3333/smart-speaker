@@ -1,0 +1,3 @@
+# Enough for typing mode and the unit tests (works on a Mac).
+anthropic>=0.125
+numpy

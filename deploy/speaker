@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Runs a speaker command the way the service runs, e.g.  speaker wake-test  or  speaker type
+# It loads the API key from /etc/pi-speaker/env, runs as the speaker user, and stops the
+# service first if needed, since only one program can use the microphone at a time.
+set -euo pipefail
+
+case "${1:-}" in
+  report|devices|"") ;;
+  *)
+    if systemctl is-active --quiet pi-speaker; then
+      echo "Stopping the pi-speaker service while you test (start it again with: sudo systemctl start pi-speaker)"
+      sudo systemctl stop pi-speaker
+    fi
+    ;;
+esac
+
+cd /opt/pi-speaker/app
+exec sudo bash -c '
+  set -a; . /etc/pi-speaker/env; set +a
+  exec runuser -u speaker -- env SPEAKER_DATA_DIR=/opt/pi-speaker HF_HUB_OFFLINE=1 \
+    HF_HOME=/opt/pi-speaker/models/hf /opt/pi-speaker/venv/bin/python -m speaker "$@"
+' _ "$@"

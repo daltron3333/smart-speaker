@@ -1,0 +1,34 @@
+[Unit]
+Description=Pi smart speaker
+After=network-online.target sound.target
+Wants=network-online.target
+# Never give up restarting: a missing Jabra or Wi-Fi should heal on its own (F10).
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=speaker
+Group=speaker
+SupplementaryGroups=audio
+WorkingDirectory=/opt/pi-speaker/app
+# Holds ANTHROPIC_API_KEY and any SPEAKER_* overrides. Owned by root, mode 600:
+# systemd reads it before dropping to the speaker user, so the key never sits in the code.
+EnvironmentFile=/etc/pi-speaker/env
+Environment=PYTHONUNBUFFERED=1
+Environment=SPEAKER_DATA_DIR=/opt/pi-speaker
+# Models are downloaded at setup time; nothing should reach the network while idle.
+Environment=HF_HUB_OFFLINE=1
+Environment=HF_HOME=/opt/pi-speaker/models/hf
+ExecStart=/opt/pi-speaker/venv/bin/python -m speaker listen
+Restart=always
+RestartSec=3
+
+# Lock it down: it may only write its own logs.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/opt/pi-speaker/logs
+
+[Install]
+WantedBy=multi-user.target

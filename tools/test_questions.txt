@@ -1,0 +1,31 @@
+# The fixed yardstick for every phase: 20 questions in four groups.
+# One question per line; text after "|" is a note for whoever reads it aloud.
+# Keep this file unchanged so results stay comparable as parts change.
+
+# General knowledge
+How far away is the moon?
+Who wrote Pride and Prejudice?
+Why is the sky blue?
+How many teaspoons are in a tablespoon?
+What is the capital of Australia?
+
+# Follow-ups (ask in this order; each depends on the one before)
+What is the tallest mountain in the world?
+How long does it take to climb it?
+Who was the first person to walk on the moon?
+What year was that?
+Who went with him?
+
+# Time and timers
+What time is it?
+What is the date today?
+Set a timer for ten seconds.
+Set a pasta timer for nine minutes.
+Cancel the pasta timer.
+
+# Hard to hear (names, numbers, quiet speech)
+Who is Chimamanda Ngozi Adichie?
+What is fifteen percent of eighty four dollars?
+How many kilometers is twenty six point two miles? | say the numbers clearly but quickly
+What is the weather like on Mars? | say this quietly
+Tell me about Tchaikovsky's Nutcracker. | from across the room

@@ -1,0 +1,11 @@
+# Everything the Pi needs. openWakeWord is installed separately by
+# deploy/setup_pi.sh with --no-deps, so it doesn't pull in tflite-runtime.
+-r requirements.txt
+sounddevice
+faster-whisper
+piper-tts
+onnxruntime
+scipy
+scikit-learn
+requests
+tqdm
