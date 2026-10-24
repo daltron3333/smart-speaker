@@ -179,9 +179,9 @@ Put overrides in `/etc/pi-speaker/env` on the Pi (or export them on the Mac), th
 
 ## Mango's personality
 
-The speaker answers as **Mango**, a cheerful stuffed-animal dog who belongs to the family's little girl. It uses simple, kind language for a young child, keeps things child-appropriate, and points to a grown-up for anything about safety, getting hurt or feeling sick, scared or sad. It's honest that it's a toy that talks through a computer, and it barks happily when asked. Doggy touches are kept to roughly one answer in three, so the time, timers and facts come back plain and quick.
+The speaker answers as **Mango**, the family's stuffed-animal dog, brought to life as the speaker's voice. Underneath it's a full assistant for an adult: direct, accurate answers on cooking, money, health, conversions and anything else, with the dog personality as the fun part rather than a limit. It barks happily when asked, and doggy touches are kept to about one answer in three, so the time, timers and facts come back plain and quick.
 
-All of this is the `SYSTEM_PROMPT` at the top of `speaker/brain.py`. Edit it to change the name, the age it speaks to, or how doggy it is, then try it with `python -m speaker type`.
+All of this is the `SYSTEM_PROMPT` at the top of `speaker/brain.py`. Edit it to change the name, the personality, or how doggy it is, then try it with `python -m speaker type`.
 
 ## Privacy and security
 
