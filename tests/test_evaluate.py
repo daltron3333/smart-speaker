@@ -11,6 +11,18 @@ class WordAccuracyTest(unittest.TestCase):
     def test_ignores_case_punctuation_and_number_style(self):
         self.assertEqual(word_accuracy("Set a timer for ten seconds.", "set a timer for 10 seconds"), 1.0)
 
+    def test_whisper_number_formats_match_spoken_numbers(self):
+        cases = [
+            ("What is fifteen percent of eighty four dollars?", "What is 15% of $84?"),
+            ("How many kilometers is twenty six point two miles?", "How many kilometers is 26.2 miles?"),
+            ("It is three hundred eighty four thousand kilometers", "It is 384,000 kilometers"),
+            ("one hundred and five", "105"),
+            ("Tell me about Tchaikovsky's Nutcracker.", "Tell me about Tchaikovskys nutcracker"),
+        ]
+        for expected, heard in cases:
+            with self.subTest(heard=heard):
+                self.assertEqual(word_accuracy(expected, heard), 1.0)
+
     def test_counts_wrong_and_missing_words(self):
         self.assertAlmostEqual(word_accuracy("who wrote pride and prejudice", "who wrote pride prejudice"), 0.8)
         self.assertAlmostEqual(word_accuracy("what time is it", "what dime is it"), 0.75)

@@ -23,6 +23,7 @@ mic ─► openWakeWord ─► Silero VAD ─► faster-whisper ─► Claude Ha
 | `speaker/phrases.py` | What it says when things fail | F8 |
 | `speaker/audio.py` | Jabra mic and speaker; mic is muted while it talks | — |
 | `speaker/main.py` | One command per build phase, plus `listen` | F11 |
+| `speaker/selftest.py` | Hands-free check of wake word, VAD and Whisper using Piper's voice | Testing |
 | `deploy/` | systemd service, Pi setup script, `speaker` test command | F10 |
 | `tools/test_questions.txt` | The fixed 20-question test script | Testing |
 
@@ -42,7 +43,16 @@ export ANTHROPIC_API_KEY=sk-ant-...        # from console.anthropic.com
 .venv/bin/python -m unittest discover -s tests
 ```
 
-The Piper voice goes in `models/piper/` (`.venv/bin/python -m piper.download_voices en_US-lessac-medium --data-dir models/piper`).
+For the voice, download Piper's model once: `.venv/bin/python -m piper.download_voices en_US-lessac-medium --data-dir models/piper`.
+
+To try the listening side on the Mac too, install the rest and download the models (about 200 MB), then run the self-test:
+
+```bash
+.venv/bin/pip install faster-whisper onnxruntime scipy scikit-learn requests tqdm
+.venv/bin/pip install --no-deps openwakeword
+HF_HOME=$PWD/models/hf .venv/bin/python -m speaker setup-models
+.venv/bin/python -m speaker self-test
+```
 
 ## Build on the Pi, phase by phase
 
@@ -50,16 +60,20 @@ The Piper voice goes in `models/piper/` (`.venv/bin/python -m piper.download_voi
 
 1. Flash **Raspberry Pi OS Lite (64-bit)** with Raspberry Pi Imager. In its settings, turn on SSH and enter your Wi-Fi.
 2. Fit the Active Cooler, use the 27 W supply, and plug in the Jabra.
-3. Get the code onto the Pi and install it:
+3. Copy the code from the Mac to the Pi:
+   ```bash
+   rsync -av --exclude .venv --exclude models --exclude logs ~/Documents/pi-speaker/ pi@raspberrypi.local:~/smart-speaker/
+   ```
+   Once the code is pushed to GitHub, you can instead run `git clone https://github.com/daltron3333/smart-speaker.git ~/smart-speaker` on the Pi (`sudo apt-get install -y git` first).
+4. Install it on the Pi:
    ```bash
    ssh pi@raspberrypi.local
-   sudo apt-get install -y git
-   git clone https://github.com/daltron3333/smart-speaker.git ~/smart-speaker
    bash ~/smart-speaker/deploy/setup_pi.sh
    sudo nano /etc/pi-speaker/env        # set ANTHROPIC_API_KEY=...
    ```
-   Change `pi@raspberrypi.local` to the user and host name you set in Imager. After a code change, push it from the Mac, then on the Pi run `git -C ~/smart-speaker pull` and the setup script again.
-4. Check the hardware: `speaker devices` should list the Jabra. **Done when** `speaker mic-test` plays your voice back cleanly.
+   Change `pi@raspberrypi.local` to the user and host name you set in Imager. After a code change, copy it over again (or `git pull`) and rerun the setup script.
+5. Check the hardware: `speaker devices` should list the Jabra. **Done when** `speaker mic-test` plays your voice back cleanly.
+6. Run `speaker self-test`. Piper speaks the test questions and the real wake word, VAD and Whisper models listen, with no microphone involved. It prints PASS or FAIL for each stage, and Whisper's speed on the Pi. That speed is the PRD's biggest risk, so this tells you early whether you need `tiny.en`. On an Apple Silicon Mac, transcription took 0.23 s per question with 94% accuracy. Expect the Pi to be several times slower.
 
 The `speaker` command runs any step with the service's settings. It stops the background service first, because only one program can use the mic at a time.
 

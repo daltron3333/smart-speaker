@@ -9,6 +9,7 @@ tested alone before the full loop (see README.md).
     python -m speaker type           Phase 4: typed question in, spoken answer out (F11)
     python -m speaker listen         Phase 5+: the whole speaker
     python -m speaker report         timing summary from logs/turns.jsonl
+    python -m speaker self-test      wake word, VAD and Whisper checked with generated speech
     python -m speaker setup-models   download every model (run once, needs internet)
 """
 
@@ -422,6 +423,13 @@ def cmd_report(settings: Settings, args) -> None:
     print(turnlog.summarize(path, field=args.field, last=args.last))
 
 
+def cmd_self_test(settings: Settings, args) -> None:
+    from speaker import selftest
+
+    if not selftest.run(settings, Path(args.script)):
+        sys.exit(1)
+
+
 def cmd_setup_models(settings: Settings, args) -> None:
     from speaker.hearing import SileroDetector
     from speaker.stt import Transcriber
@@ -468,6 +476,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--field", default="first_audio_s")
     p.add_argument("--last", type=int, help="only the last N turns")
     p.set_defaults(func=cmd_report)
+    p = sub.add_parser("self-test", help="check wake word, VAD and Whisper with generated speech")
+    p.add_argument("--script", default=str(DEFAULT_SCRIPT))
+    p.set_defaults(func=cmd_self_test)
     sub.add_parser("setup-models", help="download all models").set_defaults(func=cmd_setup_models)
 
     args = parser.parse_args(argv)

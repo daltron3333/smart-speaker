@@ -5,20 +5,67 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-_NUMBERS = {
-    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "six": "6",
-    "seven": "7", "eight": "8", "nine": "9", "ten": "10", "eleven": "11", "twelve": "12",
-    "thirteen": "13", "fourteen": "14", "fifteen": "15", "sixteen": "16", "seventeen": "17",
-    "eighteen": "18", "nineteen": "19", "twenty": "20", "thirty": "30", "forty": "40",
-    "fifty": "50", "sixty": "60", "seventy": "70", "eighty": "80", "ninety": "90",
+_UNITS = {
+    w: n
+    for n, w in enumerate(
+        "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
+        "fifteen sixteen seventeen eighteen nineteen".split()
+    )
 }
+_TENS = {w: 10 * n for n, w in enumerate("twenty thirty forty fifty sixty seventy eighty ninety".split(), 2)}
+_SCALES = {"thousand": 1000, "million": 1000000}
 
 
 def normalize(text: str) -> list[str]:
-    """Lowercase words without punctuation, with number words as digits ("ten" == "10")."""
-    text = text.lower().replace("-", " ").replace("%", " percent")
-    words = re.sub(r"[^a-z0-9' ]+", " ", text).split()
-    return [_NUMBERS.get(w, w) for w in words]
+    """Lowercase words without punctuation, with numbers as digits.
+
+    Whisper writes "15% of $84" where the script says "fifteen percent of eighty four dollars";
+    both normalize to the same words, so only real mistakes count against accuracy.
+    """
+    text = text.lower().replace("’", "'").replace("'", "").replace("-", " ")
+    text = re.sub(r"\$(\d[\d,]*(?:\.\d+)?)", r"\1 dollars", text)
+    text = re.sub(r"(?<=\d),(?=\d{3})", "", text)  # 384,000 -> 384000
+    text = text.replace("%", " percent")
+    return _join_number_words(re.findall(r"\d+(?:\.\d+)?|[a-z]+", text))
+
+
+def _join_number_words(words: list[str]) -> list[str]:
+    """["twenty", "six", "point", "two"] -> ["26.2"]."""
+    out, i = [], 0
+    while i < len(words):
+        if words[i] not in _UNITS and words[i] not in _TENS:
+            out.append(words[i])
+            i += 1
+            continue
+        total = current = 0
+        j = i
+        while j < len(words):
+            w = words[j]
+            if w in _UNITS:
+                current += _UNITS[w]
+            elif w in _TENS:
+                current += _TENS[w]
+            elif w == "hundred" and current:
+                current *= 100
+            elif w in _SCALES and (current or total):
+                total += current * _SCALES[w]
+                current = 0
+            elif w == "and" and words[j - 1] == "hundred" and j + 1 < len(words) and words[j + 1] in _UNITS.keys() | _TENS.keys():
+                pass  # "one hundred and five"
+            else:
+                break
+            j += 1
+        number = str(total + current)
+        if j + 1 < len(words) and words[j] == "point" and _UNITS.get(words[j + 1], 10) < 10:
+            j += 1
+            digits = ""
+            while j < len(words) and _UNITS.get(words[j], 10) < 10:
+                digits += str(_UNITS[words[j]])
+                j += 1
+            number += "." + digits
+        out.append(number)
+        i = j
+    return out
 
 
 def word_accuracy(expected: str, heard: str) -> float:
