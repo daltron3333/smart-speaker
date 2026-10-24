@@ -30,6 +30,7 @@ from speaker.config import Settings, load_env_file
 log = logging.getLogger("speaker")
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+NEAR_MISS_SCORE = 0.1  # wake-test reports sounds that scored at least this but didn't wake
 DEFAULT_SCRIPT = PROJECT_DIR / "tools" / "test_questions.txt"
 
 
@@ -106,16 +107,30 @@ def cmd_wake_test(settings: Settings, args) -> None:
     mic = Microphone(settings.audio_device, speaker.muted)
     wake = WakeWord(settings)
     mic.start()
-    wakes = 0
+    wakes = near_misses = 0
+    peak = 0.0  # highest score of the sound being heard now, to report near misses
+    settling = False  # just woke: ignore the tail of that same sound
     print(f"Say '{wake.phrase}'. Threshold {settings.wake_threshold}. Ctrl-C to stop.")
     try:
         while True:
             frame = mic.read()
             if frame is None:
                 continue
-            score = wake.heard(frame)
-            if score is None:
+            score = wake.score(frame)
+            if settling:
+                settling = score >= NEAR_MISS_SCORE
                 continue
+            if score < settings.wake_threshold:
+                if score >= NEAR_MISS_SCORE:
+                    peak = max(peak, score)
+                elif peak:
+                    # The sound ended without waking: worth seeing when tuning the threshold.
+                    near_misses += 1
+                    print(f"{time.strftime('%H:%M:%S')}  near miss    score {peak:.2f}", flush=True)
+                    peak = 0.0
+                continue
+            peak = 0.0
+            settling = True
             wakes += 1
             print(f"{time.strftime('%H:%M:%S')}  wake #{wakes}  score {score:.2f}", flush=True)
             turnlog.write(settings.log_dir / "wakes.jsonl", {"score": round(score, 3)})
@@ -123,7 +138,7 @@ def cmd_wake_test(settings: Settings, args) -> None:
             mic.flush()
             wake.reset()
     except KeyboardInterrupt:
-        print(f"\n{wakes} wakes.")
+        print(f"\n{wakes} wakes, {near_misses} near misses (scored {NEAR_MISS_SCORE} or more).")
 
 
 # ---------------------------------------------------------------- Phase 2
