@@ -185,7 +185,7 @@ Put overrides in `/etc/pi-speaker/env` on the Pi (or export them on the Mac), th
 
 ## Decisions taken (the PRD's open questions)
 
-Wake phrase: "hey Mango", a custom model (the PRD's default was the built-in "hey Jarvis"). Otherwise the PRD's suggested defaults: our own Python program rather than Home Assistant, a 4-second target with streaming built in, and weather as the next skill. Still to confirm on the hardware: the Pi's RAM (8 GB is comfortable; 4 GB works with `tiny.en`) and the Jabra model.
+Wake phrase: "hey Mango", a custom model (the PRD's default was the built-in "hey Jarvis"). Otherwise the PRD's suggested defaults: our own Python program rather than Home Assistant, a 4-second target with streaming built in, and weather as the next skill. The Jabra is a **SPEAK 410**: its microphone runs at 16 kHz natively, the rate the wake word and Whisper use, and it was tested on the Mac for playback and recording. Still to confirm on the hardware: the Pi's RAM (8 GB is comfortable; 4 GB works with `tiny.en`).
 
 ## Troubleshooting
 
