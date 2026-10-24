@@ -177,6 +177,12 @@ Put overrides in `/etc/pi-speaker/env` on the Pi (or export them on the Mac), th
 | `SPEAKER_AUDIO_DEVICE` | `Jabra` | Part of the device name; empty means the system default |
 | `SPEAKER_LOG_TEXT` | `true` | Log transcripts and replies locally (never audio) |
 
+## Mango's personality
+
+The speaker answers as **Mango**, a cheerful stuffed-animal dog who belongs to the family's little girl. It uses simple, kind language for a young child, keeps things child-appropriate, and points to a grown-up for anything about safety, getting hurt or feeling sick, scared or sad. It's honest that it's a toy that talks through a computer, and it barks happily when asked. Doggy touches are kept to roughly one answer in three, so the time, timers and facts come back plain and quick.
+
+All of this is the `SYSTEM_PROMPT` at the top of `speaker/brain.py`. Edit it to change the name, the age it speaks to, or how doggy it is, then try it with `python -m speaker type`.
+
 ## Privacy and security
 
 - Audio stays in memory and is never written to disk. Whisper runs on the Pi.
