@@ -50,14 +50,15 @@ The Piper voice goes in `models/piper/` (`.venv/bin/python -m piper.download_voi
 
 1. Flash **Raspberry Pi OS Lite (64-bit)** with Raspberry Pi Imager. In its settings, turn on SSH and enter your Wi-Fi.
 2. Fit the Active Cooler, use the 27 W supply, and plug in the Jabra.
-3. Copy the project over and install it:
+3. Get the code onto the Pi and install it:
    ```bash
-   rsync -av --exclude .venv --exclude models --exclude logs ~/Documents/pi-speaker/ pi@raspberrypi.local:~/pi-speaker/
    ssh pi@raspberrypi.local
-   bash ~/pi-speaker/deploy/setup_pi.sh
+   sudo apt-get install -y git
+   git clone https://github.com/daltron3333/smart-speaker.git ~/smart-speaker
+   bash ~/smart-speaker/deploy/setup_pi.sh
    sudo nano /etc/pi-speaker/env        # set ANTHROPIC_API_KEY=...
    ```
-   Change `pi@raspberrypi.local` to the user and host name you set in Imager. Run the same two commands again after any code change.
+   Change `pi@raspberrypi.local` to the user and host name you set in Imager. After a code change, push it from the Mac, then on the Pi run `git -C ~/smart-speaker pull` and the setup script again.
 4. Check the hardware: `speaker devices` should list the Jabra. **Done when** `speaker mic-test` plays your voice back cleanly.
 
 The `speaker` command runs any step with the service's settings. It stops the background service first, because only one program can use the mic at a time.
