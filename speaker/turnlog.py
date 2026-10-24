@@ -24,16 +24,22 @@ def write(path: Path, record: dict) -> None:
         log.info("turn %s", " ".join(f"{k}={v}" for k, v in timings.items()))
 
 
-def summarize(path: Path, field: str = "first_audio_s", last: int | None = None) -> str:
-    """Median and slowest value of `field` over the logged turns (optionally the last N)."""
+def summarize(path: Path, field: str = "first_audio_s", last: int | None = None, mode: str = "listen") -> str:
+    """Median and slowest value of `field` over the logged turns (optionally the last N).
+
+    Only turns of one mode are counted: typing-mode timings start at Enter, not at the end
+    of speech, so mixing them in would skew every stage.
+    """
     rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    if mode != "all":
+        rows = [r for r in rows if r.get("mode") == mode]
     if last:
         rows = rows[-last:]
     values = sorted(r[field] for r in rows if isinstance(r.get(field), (int, float)))
     if not values:
-        return f"No turns with {field} in {path}."
+        return f"No {mode} turns with {field} in {path}."
     lines = [
-        f"{len(values)} turns with {field}",
+        f"{len(values)} {mode} turns with {field}",
         f"  median  {statistics.median(values):.2f} s",
         f"  p90     {values[min(len(values) - 1, int(0.9 * len(values)))]:.2f} s",
         f"  slowest {values[-1]:.2f} s",

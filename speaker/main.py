@@ -175,8 +175,8 @@ def cmd_hear_test(settings: Settings, args) -> None:
                     break
         else:
             input("  (press Enter, then speak)")
+            mic.flush()  # drop what was heard while waiting for Enter
         speaker.listening_tone()
-        mic.flush()
         started = time.monotonic()
         audio = record_question(mic, detector, settings)
         recorded = time.monotonic()
@@ -375,8 +375,8 @@ def _one_turn(settings, mic, speaker, tts, brain, detector, stt, say) -> None:
     from speaker.audio import speak_sentences
     from speaker.hearing import record_question
 
+    # No mic.flush() here: frames already queued after the wake word are the start of the question.
     speaker.listening_tone()
-    mic.flush()
     started = time.monotonic()
     audio = record_question(mic, detector, settings)
     recorded = time.monotonic()
@@ -435,7 +435,7 @@ def cmd_report(settings: Settings, args) -> None:
     if not path.exists():
         print(f"No log yet at {path}.")
         return
-    print(turnlog.summarize(path, field=args.field, last=args.last))
+    print(turnlog.summarize(path, field=args.field, last=args.last, mode=args.mode))
 
 
 def cmd_self_test(settings: Settings, args) -> None:
@@ -490,6 +490,7 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("report", help="timing summary")
     p.add_argument("--field", default="first_audio_s")
     p.add_argument("--last", type=int, help="only the last N turns")
+    p.add_argument("--mode", default="listen", choices=["listen", "type", "all"], help="which turns to count")
     p.set_defaults(func=cmd_report)
     p = sub.add_parser("self-test", help="check wake word, VAD and Whisper with generated speech")
     p.add_argument("--script", default=str(DEFAULT_SCRIPT))

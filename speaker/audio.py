@@ -116,8 +116,9 @@ class Speaker:
                     time.sleep(0.2)  # let the room's echo die down before listening again
                     self.muted.clear()
 
-    def play(self, samples: np.ndarray, rate: int) -> None:
-        with self.busy():
+    def play(self, samples: np.ndarray, rate: int, mute_mic: bool = True) -> None:
+        holder = self.busy() if mute_mic else self._lock
+        with holder:
             sd = _sd()
             sd.play(samples, rate, device=self._device)
             sd.wait()
@@ -126,8 +127,11 @@ class Speaker:
         self.play(make_tone(freq, seconds, volume), SAMPLE_RATE)
 
     def listening_tone(self) -> None:
-        self.tone(660, 0.08)
-        self.tone(990, 0.12)
+        """Plays without muting the mic: people say "hey Mango, what's the time" in one breath,
+        and words spoken over the tone must reach the recording. The Jabra's echo
+        cancellation keeps the beep itself out of the mic."""
+        tone = np.concatenate([make_tone(660, 0.08, 0.3), make_tone(990, 0.12, 0.3)])
+        self.play(tone, SAMPLE_RATE, mute_mic=False)
 
     def cancel_tone(self) -> None:
         self.tone(440, 0.15, 0.2)
