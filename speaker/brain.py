@@ -20,9 +20,12 @@ SYSTEM_PROMPT = """\
 You are the voice of a smart speaker in someone's home. Everything you write is read aloud \
 by a text-to-speech voice, so:
 - Answer in one to three short spoken sentences, and lead with the answer.
+- Answer only what was asked. Asked the time, say the time; mention the date or time zone \
+only if asked.
 - Write plain sentences only: no lists, headings, markdown, emoji or links.
 - Say numbers the way a person would ("about three hundred eighty thousand kilometers").
-- If a full answer would be long, give the short version and offer to say more.
+- Offer to say more only when the short answer leaves out something the person would \
+clearly want; most answers need no offer.
 
 The question comes from speech-to-text and may contain misheard words. Go with the most \
 likely meaning; if it makes no sense at all, say you didn't catch it.
@@ -51,13 +54,16 @@ class Brain:
             max_retries=1,
         )
         self._clock = clock
-        self._history: list[dict] = []
+        # Each past turn is its messages: the question, any tool calls and results, the answer.
+        self._turns: list[list[dict]] = []
         self._last_turn_at: float | None = None
 
     def reply(self, question: str) -> Iterator[str]:
         """Yields the spoken reply sentence by sentence. API failures become a spoken error."""
         self._forget_if_stale()
-        messages = self._history + [{"role": "user", "content": question}]
+        question_message = {"role": "user", "content": question}
+        messages = [m for turn in self._turns for m in turn] + [question_message]
+        turn = [question_message]  # what this turn adds to the history, without thinking blocks
         spoken: list[str] = []
         try:
             for _ in range(MAX_TOOL_ROUNDS):
@@ -70,8 +76,9 @@ class Brain:
                 if response.stop_reason != "tool_use" or not tool_uses:
                     break
                 # Thinking and tool_use blocks go back unchanged, then one message with every result.
-                messages.append({"role": "assistant", "content": response.content})
-                messages.append({"role": "user", "content": [self.skills.run(b) for b in tool_uses]})
+                results = {"role": "user", "content": [self.skills.run(b) for b in tool_uses]}
+                messages += [{"role": "assistant", "content": response.content}, results]
+                turn += [{"role": "assistant", "content": _history_blocks(response.content)}, results]
             else:
                 log.warning("gave up after %d tool rounds", MAX_TOOL_ROUNDS)
         except anthropic.APIConnectionError as e:  # also covers timeouts
@@ -106,7 +113,10 @@ class Brain:
         if not spoken:
             spoken.append("Okay.")
             yield "Okay."
-        self._remember(question, " ".join(spoken))
+        # Only the final answer's text: a tool_use left over from MAX_TOOL_ROUNDS has no result.
+        answer = "".join(b.text for b in response.content if b.type == "text").strip() or "Okay."
+        turn.append({"role": "assistant", "content": [{"type": "text", "text": answer}]})
+        self._remember(turn)
 
     def _stream_round(self, messages: list[dict], spoken: list[str]) -> Iterator[str]:
         """Streams one request, yielding sentences as they complete; returns the final message."""
@@ -137,14 +147,9 @@ class Brain:
             "messages": messages,
         }
 
-    def _remember(self, question: str, answer: str) -> None:
-        # History keeps plain text only. That keeps it small, and trimming old turns never
-        # invalidates a thinking block, because none are ever replayed across turns.
-        self._history += [
-            {"role": "user", "content": question},
-            {"role": "assistant", "content": answer},
-        ]
-        self._history = self._history[-2 * self.settings.history_turns :]
+    def _remember(self, turn: list[dict]) -> None:
+        # Whole turns are dropped from the front, so a tool call never loses its result.
+        self._turns = (self._turns + [turn])[-self.settings.history_turns :]
         self._last_turn_at = self._clock()
 
     def _forget_if_stale(self) -> None:
@@ -152,9 +157,23 @@ class Brain:
             return
         if self._clock() - self._last_turn_at > self.settings.history_timeout_s:
             log.info("conversation forgotten after %.0f s of quiet", self.settings.history_timeout_s)
-            self._history = []
-            self._last_turn_at = None
+            self.forget()
 
     def forget(self) -> None:
-        self._history = []
+        self._turns = []
         self._last_turn_at = None
+
+
+def _history_blocks(content: list[Any]) -> list[dict]:
+    """A finished turn's text and tool_use blocks, for replaying in later turns.
+
+    Thinking blocks are left out: past turns don't need them, and without them, trimming old
+    turns can never invalidate one (a changed prefix makes a replayed thinking block a 400).
+    """
+    blocks = []
+    for b in content:
+        if b.type == "text" and b.text.strip():
+            blocks.append({"type": "text", "text": b.text})
+        elif b.type == "tool_use":
+            blocks.append({"type": "tool_use", "id": b.id, "name": b.name, "input": b.input})
+    return blocks

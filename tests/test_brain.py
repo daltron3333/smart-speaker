@@ -120,7 +120,7 @@ class BrainTest(unittest.TestCase):
         self.assertIs(second[-2]["content"][0], thinking)
         self.assertEqual(second[-1]["content"][0]["tool_use_id"], "toolu_set_timer")
 
-    def test_remembers_recent_turns_as_plain_text(self):
+    def test_remembers_recent_turns(self):
         brain = self.brain(answer("Mount Everest."), answer("Weeks."))
         list(brain.reply("What's the tallest mountain?"))
         list(brain.reply("How long to climb it?"))
@@ -128,10 +128,33 @@ class BrainTest(unittest.TestCase):
             self.client.requests[1]["messages"],
             [
                 {"role": "user", "content": "What's the tallest mountain?"},
-                {"role": "assistant", "content": "Mount Everest."},
+                {"role": "assistant", "content": [{"type": "text", "text": "Mount Everest."}]},
                 {"role": "user", "content": "How long to climb it?"},
             ],
         )
+
+    def test_remembers_tool_calls_but_not_thinking(self):
+        # Without the tool calls in memory, Claude later "corrects" itself for having
+        # claimed to cancel a timer it really did cancel.
+        thinking = SimpleNamespace(type="thinking", thinking="", signature="sig")
+        call = tool_block("set_timer", duration_seconds=540, label="pasta")
+        brain = self.brain(
+            ([], [thinking, call], "tool_use"),
+            answer("Your pasta timer is set."),
+            answer("Nine minutes."),
+        )
+        list(brain.reply("Set a pasta timer for nine minutes"))
+        list(brain.reply("How long was that timer?"))
+        history = self.client.requests[2]["messages"]
+        self.assertEqual([m["role"] for m in history], ["user", "assistant", "user", "assistant", "user"])
+        self.assertEqual(
+            history[1]["content"],
+            [{"type": "tool_use", "id": "toolu_set_timer", "name": "set_timer",
+              "input": {"duration_seconds": 540, "label": "pasta"}}],
+        )
+        self.assertEqual(history[2]["content"][0]["tool_use_id"], "toolu_set_timer")
+        self.assertEqual(history[3]["content"], [{"type": "text", "text": "Your pasta timer is set."}])
+        self.assertNotIn("thinking", str(history))
 
     def test_forgets_after_five_quiet_minutes(self):
         brain = self.brain(answer("Mount Everest."), answer("Climb what?"))
