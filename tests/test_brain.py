@@ -66,9 +66,9 @@ class Clock:
         return self.now
 
 
-def api_error(cls, status):
+def api_error(cls, status, message="boom"):
     request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
-    return cls("boom", response=httpx.Response(status, request=request), body=None)
+    return cls(message, response=httpx.Response(status, request=request), body=None)
 
 
 class BrainTest(unittest.TestCase):
@@ -155,6 +155,10 @@ class BrainTest(unittest.TestCase):
             (api_error(anthropic.RateLimitError, 429), phrases.BUSY),
             (api_error(anthropic.InternalServerError, 500), phrases.BUSY),
             (api_error(anthropic.BadRequestError, 400), phrases.SOMETHING_WRONG),
+            (
+                api_error(anthropic.BadRequestError, 400, "Your credit balance is too low to access the Anthropic API."),
+                phrases.NO_CREDIT,
+            ),
         ]
         for error, expected in cases:
             with self.subTest(error=type(error).__name__):

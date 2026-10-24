@@ -95,7 +95,12 @@ class Brain:
             return
         except anthropic.APIStatusError as e:
             log.error("API error %s: %s", e.status_code, e)
-            yield phrases.BUSY if e.status_code >= 500 else phrases.SOMETHING_WRONG
+            if e.status_code >= 500:
+                yield phrases.BUSY
+            elif "credit balance" in str(e.message).lower():  # no dedicated error type for this
+                yield phrases.NO_CREDIT
+            else:
+                yield phrases.SOMETHING_WRONG
             return
 
         if not spoken:
