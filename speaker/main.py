@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Iterator
 
 from speaker import phrases, turnlog
-from speaker.config import Settings
+from speaker.config import Settings, load_env_file
 
 log = logging.getLogger("speaker")
 
@@ -107,7 +107,7 @@ def cmd_wake_test(settings: Settings, args) -> None:
     wake = WakeWord(settings)
     mic.start()
     wakes = 0
-    print(f"Say 'hey Jarvis'. Threshold {settings.wake_threshold}. Ctrl-C to stop.")
+    print(f"Say '{wake.phrase}'. Threshold {settings.wake_threshold}. Ctrl-C to stop.")
     try:
         while True:
             frame = mic.read()
@@ -153,7 +153,7 @@ def cmd_hear_test(settings: Settings, args) -> None:
 
     def capture():
         if wake:
-            print("  (say 'hey Jarvis' first)", flush=True)
+            print(f"  (say '{wake.phrase}' first)", flush=True)
             while True:
                 frame = mic.read()
                 if frame is not None and wake.heard(frame) is not None:
@@ -328,7 +328,7 @@ def cmd_listen(settings: Settings, args) -> None:
 
     mic.start()
     speaker.listening_tone()  # audible sign that it has finished starting up
-    log.info("listening for %r", settings.wake_model)
+    log.info("listening for %r", wake.phrase)
     missed_reads = 0
     while True:
         frame = mic.read()
@@ -462,7 +462,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("wake-test", help="Phase 1: wake word only").set_defaults(func=cmd_wake_test)
     p = sub.add_parser("hear-test", help="Phase 2: record and transcribe")
     p.add_argument("--script", nargs="?", const=str(DEFAULT_SCRIPT), help="score against the test questions")
-    p.add_argument("--no-wake", action="store_true", help="press Enter instead of saying the wake word")
+    p.add_argument("--no-wake", action="store_true", help="press Enter instead of saying the wake phrase")
     p.set_defaults(func=cmd_hear_test)
     p = sub.add_parser("say", help="Phase 3: speak text")
     p.add_argument("text", nargs="+")
@@ -488,4 +488,5 @@ def main(argv: list[str] | None = None) -> None:
     )
     for noisy in ("httpx", "httpx2", "anthropic", "faster_whisper"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
+    load_env_file(PROJECT_DIR / ".env")
     args.func(Settings.from_env(), args)

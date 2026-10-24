@@ -1,7 +1,10 @@
+import os
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from speaker.config import Settings
+from speaker.config import Settings, load_env_file
 from speaker.evaluate import load_script, word_accuracy
 
 SCRIPT = Path(__file__).resolve().parent.parent / "tools" / "test_questions.txt"
@@ -44,6 +47,18 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual(settings.history_turns, 6)
         self.assertFalse(settings.log_text)
         self.assertEqual(settings.model, "claude-haiku-5-5")
+        self.assertEqual(settings.wake_model, "hey_mango")
+
+    def test_env_file_fills_in_unset_variables_only(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / ".env"
+            path.write_text('# comment\nexport SPEAKER_T_ONE="from file"\nSPEAKER_T_TWO=from file\nSPEAKER_T_EMPTY=\n')
+            with mock.patch.dict(os.environ, {"SPEAKER_T_TWO": "already set"}, clear=False):
+                load_env_file(path)
+                self.assertEqual(os.environ["SPEAKER_T_ONE"], "from file")
+                self.assertEqual(os.environ["SPEAKER_T_TWO"], "already set")
+                self.assertNotIn("SPEAKER_T_EMPTY", os.environ)
+            load_env_file(Path(folder) / "missing")  # no file is fine
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ fi
 
 echo "== Code"
 sudo mkdir -p "$APP/logs" "$APP/models"
-sudo rsync -a --delete --exclude .venv --exclude .git --exclude logs --exclude models \
+sudo rsync -a --delete --exclude .venv --exclude .git --exclude .env --exclude logs --exclude models \
   --exclude __pycache__ "$SRC/" "$APP/app/"
 
 echo "== Python packages (this takes a while the first time)"

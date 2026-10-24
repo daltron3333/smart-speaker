@@ -26,7 +26,7 @@ class Settings:
 
     # Ears
     audio_device: str = "Jabra"  # matched as a substring of the device name; "" = system default
-    wake_model: str = "hey_jarvis"
+    wake_model: str = "hey_mango"  # wakewords/hey_mango.onnx; falls back to hey_jarvis until trained
     wake_threshold: float = 0.5
 
     # Hearing
@@ -77,3 +77,26 @@ class Settings:
             else:
                 overrides[f.name] = raw
         return cls(**overrides)
+
+
+def load_env_file(path: Path) -> None:
+    """Loads KEY=VALUE lines (like ANTHROPIC_API_KEY) into the environment for local runs.
+
+    Values already set in the environment win. On the Pi the service uses
+    /etc/pi-speaker/env instead, and this file is never copied there.
+    """
+    try:
+        lines = path.read_text().splitlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if key.startswith("export "):
+            key = key[len("export ") :].strip()
+        value = value.strip().strip("\"'")
+        if key and value:
+            os.environ.setdefault(key, value)

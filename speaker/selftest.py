@@ -37,7 +37,7 @@ def run(settings: Settings, script: Path) -> bool:
     from speaker.hearing import make_detector, record_question
     from speaker.stt import Transcriber
     from speaker.tts import load_tts
-    from speaker.wakeword import WakeWord
+    from speaker.wakeword import WakeWord, phrase_for
 
     tts = load_tts(settings)
     noise = np.random.default_rng(0)
@@ -58,8 +58,15 @@ def run(settings: Settings, script: Path) -> bool:
     stt.warm_up()
 
     # Wake word
-    score = max(wake.score(f) for f in _frames(np.concatenate([quiet(1), speech("Hey Jarvis."), quiet(1)])))
-    results.append(("Wake word hears 'hey Jarvis'", score >= settings.wake_threshold, f"score {score:.2f}"))
+    phrase = speech(wake.phrase.capitalize() + ".")
+    score = max(wake.score(f) for f in _frames(np.concatenate([quiet(1), phrase, quiet(1)])))
+    results.append((f"Wake word hears '{wake.phrase}'", score >= settings.wake_threshold, f"score {score:.2f}"))
+    if wake.is_fallback:
+        results.append((
+            f"Wake word is '{phrase_for(settings.wake_model)}'",
+            False,
+            f"no model yet; add wakewords/{settings.wake_model}.onnx (see README)",
+        ))
 
     # End of speech
     question = speech("What time is it?")
