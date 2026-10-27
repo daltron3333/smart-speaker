@@ -58,9 +58,12 @@ class SkillsTest(unittest.TestCase):
         self.assertEqual(result["tool_use_id"], f"toolu_{name}")
         return result
 
-    def test_time_is_spoken_style(self):
-        result = json.loads(self.run_tool("get_current_time")["content"])
-        self.assertEqual(result, {"time": "9:05 AM", "date": "Sunday, October 4, 2026", "time_zone": "PDT"})
+    def test_time_note_is_spoken_style(self):
+        self.assertEqual(self.skills.time_note(), "[Local time: 9:05 AM on Sunday, October 4, 2026, PDT]")
+
+    def test_there_is_no_clock_tool(self):
+        # The time comes with each question instead, saving a round trip to the API.
+        self.assertNotIn("get_current_time", {t["name"] for t in self.skills.tools})
 
     def test_set_list_and_cancel(self):
         set_result = json.loads(self.run_tool("set_timer", duration_seconds=540, label="pasta")["content"])

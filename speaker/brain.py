@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any, Callable, Iterator
 
@@ -44,8 +45,10 @@ clearly want; most answers need no offer.
 The question comes from speech-to-text and may contain misheard words. Go with the most \
 likely meaning; if it makes no sense at all, say you didn't catch it.
 
-Use the tools for the time, the date and timers, and never guess the time. You can't play \
-music, control devices, check the weather or search the web; if asked, say so in one sentence.\
+Each message starts with the current local time in square brackets. Use it to answer \
+questions about the time, the date or the day, and otherwise ignore it; never mention it \
+unless asked. Use the tools to set, list and cancel timers. You can't play music, control \
+devices, check the weather or search the web; if asked, say so in one sentence.\
 """
 
 MAX_TOOL_ROUNDS = 5
@@ -72,10 +75,25 @@ class Brain:
         self._turns: list[list[dict]] = []
         self._last_turn_at: float | None = None
 
+    def warm_up(self) -> None:
+        """Opens the HTTPS connection to the API in the background, so the next question
+        doesn't wait for DNS and TLS setup. Idle connections close after about 5 seconds, so
+        call this shortly before a question (on wake, and again when recording ends).
+        Listing one model is free."""
+
+        def connect() -> None:
+            try:
+                self.client.models.list(limit=1)
+            except Exception as e:  # a failed warm-up only costs the time it was meant to save
+                log.debug("API warm-up failed: %s", e)
+
+        threading.Thread(target=connect, name="api-warm-up", daemon=True).start()
+
     def reply(self, question: str) -> Iterator[str]:
         """Yields the spoken reply sentence by sentence. API failures become a spoken error."""
         self._forget_if_stale()
-        question_message = {"role": "user", "content": question}
+        # The time goes in the user message, not the system prompt, so the prompt stays cacheable.
+        question_message = {"role": "user", "content": f"{self.skills.time_note()}\n{question}"}
         messages = [m for turn in self._turns for m in turn] + [question_message]
         turn = [question_message]  # what this turn adds to the history, without thinking blocks
         spoken: list[str] = []

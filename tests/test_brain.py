@@ -1,7 +1,9 @@
 """Brain tests against a fake Anthropic client, so they need no API key or network."""
 
 import contextlib
+import threading
 import unittest
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import anthropic
@@ -58,6 +60,10 @@ def answer(*chunks):
     return list(chunks), [text_block("".join(chunks))], "end_turn"
 
 
+FIXED_NOW = datetime(2026, 10, 27, 23, 18, tzinfo=timezone(timedelta(hours=5, minutes=30), "IST"))
+NOTE = "[Local time: 11:18 PM on Tuesday, October 27, 2026, IST]"
+
+
 class Clock:
     def __init__(self):
         self.now = 0.0
@@ -81,7 +87,8 @@ class BrainTest(unittest.TestCase):
 
     def brain(self, *responses, **settings):
         self.client = FakeClient(*responses)
-        return Brain(Settings(**settings), Skills(self.timers), client=self.client, clock=self.clock)
+        skills = Skills(self.timers, now=lambda: FIXED_NOW)
+        return Brain(Settings(**settings), skills, client=self.client, clock=self.clock)
 
     def test_streams_sentences_as_they_complete(self):
         brain = self.brain(answer("It is about 384,000 km", " away. That's far", "!"))
@@ -97,8 +104,29 @@ class BrainTest(unittest.TestCase):
         self.assertNotIn("temperature", request)
         self.assertEqual(
             {t["name"] for t in request["tools"]},
-            {"get_current_time", "set_timer", "list_timers", "cancel_timer"},
+            {"set_timer", "list_timers", "cancel_timer"},
         )
+
+    def test_each_question_carries_the_local_time(self):
+        brain = self.brain(answer("It's eleven eighteen."))
+        list(brain.reply("What time is it?"))
+        self.assertEqual(self.client.requests[0]["messages"][-1]["content"], f"{NOTE}\nWhat time is it?")
+
+    def test_warm_up_opens_a_connection_in_the_background(self):
+        listed = threading.Event()
+        self.client = FakeClient()
+        self.client.models = SimpleNamespace(list=lambda **kw: listed.set())
+        brain = Brain(Settings(), Skills(self.timers), client=self.client, clock=self.clock)
+        brain.warm_up()
+        self.assertTrue(listed.wait(2))
+
+    def test_a_failed_warm_up_is_harmless(self):
+        def fail(**kw):
+            raise anthropic.APIConnectionError(request=httpx.Request("GET", "https://api.anthropic.com"))
+
+        self.client = FakeClient()
+        self.client.models = SimpleNamespace(list=fail)
+        Brain(Settings(), Skills(self.timers), client=self.client, clock=self.clock).warm_up()  # no exception
 
     def test_thinking_can_be_turned_off(self):
         brain = self.brain(answer("Hi."), thinking="off")
@@ -127,9 +155,9 @@ class BrainTest(unittest.TestCase):
         self.assertEqual(
             self.client.requests[1]["messages"],
             [
-                {"role": "user", "content": "What's the tallest mountain?"},
+                {"role": "user", "content": f"{NOTE}\nWhat's the tallest mountain?"},
                 {"role": "assistant", "content": [{"type": "text", "text": "Mount Everest."}]},
-                {"role": "user", "content": "How long to climb it?"},
+                {"role": "user", "content": f"{NOTE}\nHow long to climb it?"},
             ],
         )
 

@@ -377,6 +377,7 @@ def _one_turn(settings, mic, speaker, tts, brain, detector, stt, say) -> None:
 
     # No mic.flush() here: frames already queued after the wake word are the start of the question.
     speaker.listening_tone()
+    brain.warm_up()  # connect to the API while the question is being spoken...
     started = time.monotonic()
     audio = record_question(mic, detector, settings)
     recorded = time.monotonic()
@@ -384,6 +385,7 @@ def _one_turn(settings, mic, speaker, tts, brain, detector, stt, say) -> None:
         log.info("nobody spoke after the wake word")
         speaker.cancel_tone()
         return
+    brain.warm_up()  # ...and again, since an idle connection closes after about 5 seconds
     text = stt.transcribe(audio)
     transcribed = time.monotonic()
     del audio  # never kept past this point

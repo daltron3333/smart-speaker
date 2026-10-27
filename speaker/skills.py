@@ -1,4 +1,4 @@
-"""Tools Claude can call: the time and date (F6) and timers (F7)."""
+"""The time and date (F6), sent with every question, and the timer tools Claude can call (F7)."""
 
 from __future__ import annotations
 
@@ -14,14 +14,9 @@ log = logging.getLogger(__name__)
 
 MAX_TIMER_S = 24 * 60 * 60
 
+# There is no clock tool: the time arrives with each question (Skills.time_note), which saves
+# a second round trip to the API on the speaker's most common question.
 TOOLS = [
-    {
-        "name": "get_current_time",
-        "description": "Get the current local time, date, day of the week and time zone. "
-        "Use this whenever the answer depends on the time or date, including questions like "
-        "'what day is it tomorrow'.",
-        "input_schema": {"type": "object", "properties": {}},
-    },
     {
         "name": "set_timer",
         "description": "Start a countdown timer. When it ends, the speaker rings and says the "
@@ -159,13 +154,12 @@ class Skills:
             log.warning("tool %s failed: %s", block.name, e)
             return {"type": "tool_result", "tool_use_id": block.id, "content": str(e), "is_error": True}
 
-    def _tool_get_current_time(self, _: dict) -> dict:
+    def time_note(self) -> str:
+        """The local time and date in the form put in front of each question."""
         now = self._now()
-        return {
-            "time": now.strftime("%I:%M %p").lstrip("0"),
-            "date": now.strftime("%A, %B %d, %Y").replace(" 0", " "),
-            "time_zone": now.tzname() or "local",
-        }
+        time_of_day = now.strftime("%I:%M %p").lstrip("0")
+        date = now.strftime("%A, %B %d, %Y").replace(" 0", " ")
+        return f"[Local time: {time_of_day} on {date}, {now.tzname() or 'local time'}]"
 
     def _tool_set_timer(self, args: dict) -> dict:
         seconds = args.get("duration_seconds")
