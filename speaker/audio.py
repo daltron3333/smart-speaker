@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import math
 import queue
 import threading
 import time
@@ -101,6 +102,7 @@ class Speaker:
         self.muted = threading.Event()
         self._lock = threading.RLock()
         self._depth = 0
+        self._rates: dict[int, int] = {}  # clip rate -> rate the device will actually play
 
     @contextlib.contextmanager
     def busy(self) -> Iterator[None]:
@@ -117,11 +119,35 @@ class Speaker:
                     self.muted.clear()
 
     def play(self, samples: np.ndarray, rate: int, mute_mic: bool = True) -> None:
+        target = self._device_rate(rate)
+        if target != rate:
+            samples, rate = resample(samples, rate, target), target
         holder = self.busy() if mute_mic else self._lock
         with holder:
             sd = _sd()
             sd.play(samples, rate, device=self._device)
             sd.wait()
+
+    def _device_rate(self, rate: int) -> int:
+        """A rate the output device accepts, as close to `rate` as allowed.
+
+        macOS converts any rate itself, but on the Pi ALSA hands audio straight to the
+        hardware, and the Jabra plays only 8, 16 or 48 kHz, so Piper's 22.05 kHz is refused.
+        """
+        if rate not in self._rates:
+            sd = _sd()
+            choice = rate
+            for candidate in (rate, 48000, 44100, 16000):
+                try:
+                    sd.check_output_settings(device=self._device, samplerate=candidate, channels=1, dtype="int16")
+                except Exception:
+                    continue
+                choice = candidate
+                break
+            if choice != rate:
+                log.info("output device can't play %d Hz; converting to %d Hz", rate, choice)
+            self._rates[rate] = choice
+        return self._rates[rate]
 
     def tone(self, freq: float = 880.0, seconds: float = 0.15, volume: float = 0.3) -> None:
         self.play(make_tone(freq, seconds, volume), SAMPLE_RATE)
@@ -141,6 +167,20 @@ class Speaker:
             for _ in range(rings):
                 self.tone(1320, 0.2, 0.4)
                 self.tone(1320, 0.2, 0.0)
+
+
+def resample(samples: np.ndarray, rate: int, target: int) -> np.ndarray:
+    """Converts int16 audio from `rate` to `target` Hz."""
+    audio = samples.astype(np.float32)
+    try:
+        from scipy.signal import resample_poly
+
+        step = math.gcd(rate, target)
+        out = resample_poly(audio, target // step, rate // step)
+    except ImportError:  # typing mode on a Mac may not have scipy; linear is fine for speech
+        n = int(round(len(audio) * target / rate))
+        out = np.interp(np.linspace(0, len(audio) - 1, n), np.arange(len(audio)), audio)
+    return np.clip(out, -32768, 32767).astype(np.int16)
 
 
 def make_tone(freq: float, seconds: float, volume: float) -> np.ndarray:
